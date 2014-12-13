@@ -51,11 +51,11 @@
 #include <sys/conf.h>
 #include <sys/uio.h>
 #include <sys/fcntl.h>
-/*#include <sys/input.h>*/
 #include <sys/sysctl.h>
 #include <sys/event.h>
 #include <sys/kthread.h>
 #include <sys/selinfo.h>
+#include <sys/mouse.h>
 
 #include <dev/smbus/smbconf.h>
 #include <dev/smbus/smbus.h>
@@ -116,6 +116,8 @@ struct cyapa_softc {
 	int	remote_mode;		/* 0 for streaming mode */
 	int	resolution;		/* count/mm */
 	int	sample_rate;		/* samples/sec */
+
+	mousehw_t hw;			/* hardware information */
 };
 
 #define CYPOLL_SHUTDOWN	0x0001
@@ -311,7 +313,7 @@ static device_method_t cyapa_methods[] = {
 };
 
 static driver_t cyapa_driver = {
-	"smb",
+	"cyapa",
 	cyapa_methods,
 	sizeof(struct cyapa_softc),
 };
@@ -464,6 +466,11 @@ device_printf(dev, "unit = %d\n", unit);
 
 	inputev_register(&sc->iev);
 #endif
+	sc->hw.buttons = 3; /* emulate 3 buttons */
+	sc->hw.iftype = MOUSE_IF_UNKNOWN;
+	sc->hw.type = MOUSE_PAD;
+	sc->hw.model = MOUSE_MODEL_GENERIC;
+	sc->hw.hwid = 0;
 
 	/*
 	 * Start the polling thread.
@@ -938,19 +945,16 @@ cyapa_filt(struct knote *kn, long hint)
 }
 
 static int
-cyapaioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
+cyapaioctl(struct cdev *dev, u_long cmd, caddr_t addr, int fflag,
 	   struct thread *td)
 {
 	device_t bus;		/* smbbus */
 	/*struct cyapacmd *s = (struct cyapacmd *)ap->a_data;*/
-	void *s = NULL;
 	struct cyapa_softc *sc = CYAPA_SOFTC(dev);
 	int error;
 
 	if (sc == NULL)
 		return (ENXIO);
-	if (s == NULL)
-		return (EINVAL);
 
 	/*
 	 * NOTE: smbus_*() functions automatically recurse the parent to
@@ -965,6 +969,18 @@ cyapaioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 		return (error);
 
 	switch (cmd) {
+	case MOUSE_GETLEVEL:
+	case MOUSE_SETLEVEL:
+		error = ENOTTY;
+		break;
+	case MOUSE_GETHWINFO:
+		*(mousehw_t *)addr = sc->hw;
+		break;
+	case MOUSE_GETMODE:
+	case MOUSE_SETMODE:
+	case MOUSE_GETSTATUS:
+		error = ENOTTY;
+		break;
 	default:
 #if 0
 		error = inputev_ioctl(&sc->iev, ap->a_cmd, ap->a_data);
@@ -1258,6 +1274,6 @@ fifo_reset(struct cyapa_fifo *fifo)
 	fifo->windex = 0;
 }
 
-DRIVER_MODULE(smb, smbus, cyapa_driver, cyapa_devclass, NULL, NULL);
-MODULE_DEPEND(smb, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
-MODULE_VERSION(smb, 1);
+DRIVER_MODULE(cyapa, smbus, cyapa_driver, cyapa_devclass, NULL, NULL);
+MODULE_DEPEND(cyapa, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
+MODULE_VERSION(cyapa, 1);
