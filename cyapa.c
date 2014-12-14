@@ -118,6 +118,7 @@ struct cyapa_softc {
 	int	sample_rate;		/* samples/sec */
 
 	mousehw_t hw;			/* hardware information */
+	mousemode_t mode;
 };
 
 #define CYPOLL_SHUTDOWN	0x0001
@@ -471,6 +472,15 @@ device_printf(dev, "unit = %d\n", unit);
 	sc->hw.type = MOUSE_PAD;
 	sc->hw.model = MOUSE_MODEL_GENERIC;
 	sc->hw.hwid = 0;
+
+	sc->mode.protocol = MOUSE_PROTO_PS2;
+	sc->mode.rate = -1;
+	sc->mode.resolution = -1;
+	sc->mode.accelfactor = 1;
+	sc->mode.level = 0;
+	sc->mode.packetsize = MOUSE_PS2_PACKETSIZE;
+	sc->mode.syncmask[0] = MOUSE_PS2_SYNCMASK;
+	sc->mode.syncmask[1] = MOUSE_PS2_SYNC;
 
 	/*
 	 * Start the polling thread.
@@ -977,6 +987,8 @@ cyapaioctl(struct cdev *dev, u_long cmd, caddr_t addr, int fflag,
 		*(mousehw_t *)addr = sc->hw;
 		break;
 	case MOUSE_GETMODE:
+		*(mousemode_t *)addr = sc->mode;
+		break;
 	case MOUSE_SETMODE:
 	case MOUSE_GETSTATUS:
 		error = ENOTTY;
