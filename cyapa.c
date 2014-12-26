@@ -55,6 +55,7 @@
 #include <sys/event.h>
 #include <sys/kthread.h>
 #include <sys/selinfo.h>
+#include <sys/malloc.h>
 #include <sys/mouse.h>
 
 #include <dev/smbus/smbconf.h>
@@ -562,7 +563,11 @@ cyaparead(struct cdev *dev, struct uio *uio, int ioflag)
 	int error;
 	int didread;
 	size_t n;
+	char *tmpbuf;
+	ssize_t resid, rdsize;
 
+	resid = uio->uio_resid;
+	tmpbuf = malloc(resid, M_TEMP, M_WAITOK);
 	/*
 	 * If buffer is empty, load a new event if it is ready
 	 */
@@ -639,10 +644,11 @@ again:
 	/*
 	 * Return any buffered data
 	 */
-	while (error == 0 && uio->uio_resid &&
+	rdsize = 0;
+	while (error == 0 && resid &&
 	       (n = fifo_ready(&sc->rfifo)) > 0) {
-		if (n > uio->uio_resid)
-			n = uio->uio_resid;
+		if (n > resid)
+			n = resid;
 #if 0
 		{
 			uint8_t *ptr = fifo_read(&sc->rfifo, 0);
@@ -653,7 +659,9 @@ again:
 			printf("\n");
 		}
 #endif
-		error = uiomove(fifo_read(&sc->rfifo, 0), n, uio);
+		bcopy(fifo_read(&sc->rfifo, 0), tmpbuf + rdsize, n);
+		rdsize += n;
+		resid -= n;
 		if (error)
 			break;
 		fifo_read(&sc->rfifo, n);
@@ -661,8 +669,10 @@ again:
 	}
 	cyapa_unlock(sc);
 
+	error = uiomove(tmpbuf, rdsize, uio);
 	if (error == 0 && didread == 0)
 		error = EWOULDBLOCK;
+	free(tmpbuf, M_TEMP);
 
 	return error;
 }
