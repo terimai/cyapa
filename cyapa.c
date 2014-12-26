@@ -314,7 +314,7 @@ static device_method_t cyapa_methods[] = {
 };
 
 static driver_t cyapa_driver = {
-	"cyapa",
+	"smb",
 	cyapa_methods,
 	sizeof(struct cyapa_softc),
 };
@@ -351,10 +351,12 @@ cyapa_probe(device_t dev)
 	int unit;
 	int addr;
 	int error;
+	int dummy = 0;
 
 device_printf(dev, "cyapa_probe\n");
 	unit = device_get_unit(dev);
 device_printf(dev, "unit = %x\n", unit);
+	tsleep(&dummy, 0, "cyastab", hz);
 
 	/*
 	 * Only match against specific addresses to avoid blowing up
@@ -396,15 +398,11 @@ device_printf(dev, "cyapa_attach\n");
 
 	unit = device_get_unit(dev);
 device_printf(dev, "unit = %d\n", unit);
-#ifdef COMMENT_OUT__
 	if ((unit & 0x04FF) != (0x0400 | 0x067))
 		return ENXIO;
-#endif /*COMMENT_OUT__*/
 	addr = unit & 0x3FF;
-#ifdef COMMENT_OUT__
 	if (init_device(dev, &cap, addr, 0))
 		return ENXIO;
-#endif /*COMMENT_OUT__*/
 
 	sc->dev = dev;
 	sc->unit = unit;
@@ -1021,7 +1019,6 @@ cyapa_poll_thread(void *arg)
 	int isidle = 0;
 
 	bus = device_get_parent(sc->dev);
-
 	while ((sc->poll_flags & CYPOLL_SHUTDOWN) == 0) {
 		error = smbus_request_bus(bus, sc->dev, SMB_WAIT);
 		if (error == 0) {
