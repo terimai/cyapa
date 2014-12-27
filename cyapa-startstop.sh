@@ -4,7 +4,7 @@
 #
 
 # PROVIDE: cyapa
-# REQUIRE: hald
+# REQUIRE: dbus hald
 #
 
 . /etc/rc.subr
@@ -35,11 +35,14 @@ cyapa_loadmod()
 cyapa_start()
 {
 	cyapa_loadmod
+	sleep 1
 	ls /dev/cyapa* | while read devfile; do
 		halbasename=`basename "$devfile" | sed -e 's/-/_/g'`
 		udi="/org/freedesktop/Hal/devices/$halbasename"
 		n=0
-		/usr/local/bin/hal-device -a $udi << __END__
+		ok=0
+		while [ $ok -eq 0 ];do
+			/usr/local/bin/hal-device -a $udi << __END__
 freebsd.device_file='$devfile'
 freebsd.driver='smb'
 freebsd.unit=$n
@@ -51,6 +54,12 @@ info.udi = '$udi'
 input.device = '/dev/sysmouse'
 input.x11_driver = 'mouse'
 __END__
+			if [ $? = 0 ];then
+				ok=1
+			else
+				sleep 3
+			fi
+		done
 		n=`expr $n + 1`
 	done
 }
