@@ -376,7 +376,7 @@ device_printf(dev, "unit = %x\n", unit);
 		return BUS_PROBE_NOWILDCARD;
 
 	device_set_desc(dev, "Cypress APA I2C Trackpad");
-
+device_printf(dev, "probe ok\n");
 	return (BUS_PROBE_VENDOR);
 }
 
